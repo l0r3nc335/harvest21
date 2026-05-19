@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .touch-pan-x-y {
+    touch-action: pan-x pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .touch-pan-y-only {
+    touch-action: pan-y pinch-zoom;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+

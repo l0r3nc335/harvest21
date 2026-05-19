@@ -1,0 +1,28 @@
+# Node deps — installed fresh inside the image
+node_modules
+
+# Next.js build output
+.next
+out
+
+# All env files — docker-compose injects .env.cypress-docker via env_file
+# This prevents .env.local (remote Supabase credentials) from leaking in
+.env
+.env.local
+.env.develop
+.env.staging
+.env.prod
+.env.m4-staging
+.env.cypress-local
+
+# Git metadata
+.git
+.gitignore
+
+# Cypress output artefacts
+cypress/screenshots
+cypress/videos
+
+# macOS metadata
+.DS_Store
+*.log

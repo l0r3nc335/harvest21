@@ -1,0 +1,32 @@
+echo ""
+echo "🔍 Running pre-push validation checks..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Run TypeScript type checking
+echo "📝 Checking TypeScript types..."
+npm run type-check
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ TypeScript check failed!"
+  echo "Please fix type errors before pushing."
+  exit 1
+fi
+echo "✅ TypeScript check passed"
+echo ""
+
+# Run production build
+echo "🔨 Running production build..."
+npm run build
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ Build failed!"
+  echo "Please fix build errors before pushing."
+  exit 1
+fi
+echo "✅ Build passed"
+echo ""
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "✅ All validation checks passed! Pushing..."
+echo ""

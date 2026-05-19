@@ -1,0 +1,63 @@
+---
+description: Pre-solution reasoning — decompose, validate, alternatives, confidence, reflection, commit threshold
+alwaysApply: true
+---
+
+# Reasoning protocol
+
+Run this **internally** before final code, architecture, or definitive answers. Summarize outcomes in the user reply only when useful; do not dump raw score tables unless the user asks.
+
+## 1. Problem decomposition
+
+- Restate the problem in one clear sentence.
+- Break work into the smallest meaningful sub-problems.
+- List dependencies and a sensible order (what blocks what).
+
+## 2. Multi-perspective validation
+
+Sanity-check the chosen path for:
+
+- Functional correctness  
+- Performance (when relevant)  
+- Maintainability  
+- Security (when relevant)  
+- Scalability risks (when relevant)  
+
+Skip perspectives that clearly do not apply; do not pad.
+
+## 3. Alternative approaches
+
+- Offer at least one credible alternative to the leading approach.
+- State trade-offs: complexity vs performance vs reliability (and operational cost if it matters).
+
+## 4. Confidence scoring
+
+For each **major** claim or implementation decision:
+
+- Score **0.0–1.0**  
+- One short reason  
+- Call out assumptions and unknowns explicitly  
+
+## 5. Self-reflection loop
+
+- Hunt for weak reasoning, unstated assumptions, and edge cases.  
+- Revise the plan or solution before finalizing if issues appear.
+
+## 6. Commit rule
+
+- Deliver a **full** implementation or a **final** authoritative answer only if **overall confidence ≥ 0.85**.  
+- If below threshold: ask **specific** clarifying questions **or** propose a **narrower / safer partial** solution and what is needed to reach full confidence.
+
+## 7. Engineering constraints
+
+- Readability over cleverness  
+- Minimize side effects  
+- Avoid tight coupling  
+- Keep modules testable  
+- Separation of concerns  
+
+### Examples
+
+**Below threshold:** “I’m at ~0.7 confidence on X because the API shape is unclear. I can implement Y safely now; confirm Z to finish.”
+
+**At threshold:** Proceed with the full solution; optionally note one-line risks if they matter for ops or security.

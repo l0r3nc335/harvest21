@@ -1,0 +1,114 @@
+---
+alwaysApply: true
+---
+# Cursor Rules for Next.js + Supabase + Tailwind + Radix UI
+# Author: Ajay Prompt
+
+project:
+  name: Next.js Web App
+  description: >
+    A scalable, adaptive, and responsive web application built using Next.js, Supabase, TailwindCSS, and Radix UI.
+    Follows modern Next.js standards for routing, layouts, and server components.
+
+stack:
+  framework: Next.js 14+
+  backend: Supabase
+  ui: TailwindCSS, Radix UI
+  language: TypeScript
+  router: App Router (pages/layouts as per Next.js docs)
+  style_system: Tailwind + Component Modules
+
+rules:
+  - Always use TypeScript (.tsx, .ts).
+  - Use Next.js App Router (`app/` directory) for routing and layouts.
+  - Follow atomic file structure and modular imports.
+  - All components must be functional React components.
+  - Use Server Components by default; only use Client Components when interaction or state is required (`"use client"`).
+  - Pages must be a Server Side! create a component if needs to used the "use client"
+  - Use async/await for all Supabase data operations.
+  - Maintain separation of concerns:
+      * `/app` → routing, layouts, pages
+      * `/components` → UI and reusable components
+      * `/lib` → utilities, Supabase client, helper functions
+      * `/styles` → Tailwind configuration and globals
+      * `/hooks` → custom React hooks
+      * `/types` → TypeScript interfaces and types
+      * `/context` → React context providers (if needed)
+  - Manage Supabase client via `/lib/supabaseClient.ts`.
+  - Handle all environment variables securely via `.env.local` with `NEXT_PUBLIC_` prefix for client access.
+  - Always validate Supabase data responses and handle errors gracefully.
+  - For UI:
+      * Use Tailwind for layout and spacing.
+      * Use Radix UI primitives for accessibility and interactivity.
+      * Keep design adaptive and mobile-first.
+      * Avoid inline styles unless dynamic.
+  - Keep components small and single-responsibility.
+  - Reuse layouts where possible using `layout.tsx` files.
+  - Avoid prop drilling by using Context or hooks where necessary.
+  - Always ensure accessibility (aria labels, keyboard navigation).
+  - Add comments for non-trivial logic.
+  - Prefer Next.js `Image` and `Link` components for optimization.
+
+standards:
+  naming:
+    - Folders and files: kebab-case (e.g. `user-profile`, `auth-layout`)
+    - Components and hooks: PascalCase (e.g. `UserCard.tsx`, `useAuth.ts`)
+    - Constants: UPPER_SNAKE_CASE
+  imports:
+    - Group by: React → Next.js → Libraries → Local
+    - Use absolute imports (`@/components/...`)
+  commits:
+    - Follow Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`, etc.)
+  testing:
+    - Write testable components; consider adding Jest or Playwright later.
+  responsiveness:
+    - Always check Tailwind breakpoints (`sm`, `md`, `lg`, `xl`).
+    - Use flex or grid for adaptive layouts.
+    - Prefer relative units (%, rem, vw/vh) over px when possible.
+
+folder_structure_example:
+  app/
+    layout.tsx        # Root layout
+    page.tsx          # Home page
+    dashboard/
+      layout.tsx
+      page.tsx
+      settings/
+        page.tsx
+  components/
+    ui/
+      Button.tsx
+      Card.tsx
+    navigation/
+      Navbar.tsx
+      Sidebar.tsx
+  lib/
+    supabaseClient.ts
+    utils.ts
+  styles/
+    globals.css
+    tailwind.config.js
+  hooks/
+    useAuth.ts
+    useTheme.ts
+  types/
+    user.ts
+  context/
+    AuthContext.tsx
+
+quality:
+  - All new files must pass TypeScript checks and ESLint rules.
+  - No unused imports, variables, or commented-out code.
+  - Keep functions under 100 lines.
+  - Use async/await, avoid promise chaining.
+  - Each PR must be reviewed for readability and reusability.
+
+ai_guidelines:
+  - When generating components, include type definitions and prop interfaces.
+  - Use descriptive names and doc comments.
+  - When generating Supabase queries, ensure proper error handling and typing.
+  - Avoid redundant imports and ensure consistent code formatting (Prettier).
+  - Generate Tailwind classes with readability and responsiveness in mind.
+  - Generate layout code following Next.js official recommendations:
+    https://nextjs.org/docs/pages/building-your-application/routing/pages-and-layouts
+  - A PAGE MUST BE ALWAYS SERVERSIDE RENDERING, ONLY USED "use client" on a components

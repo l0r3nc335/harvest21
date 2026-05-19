@@ -1,0 +1,50 @@
+{
+  "admin": {
+    "email": "airken.99+admin@gmail.com",
+    "password": "Test123!",
+    "role": 1
+  },
+  "missionary1": {
+    "email": "m1@h21test.local",
+    "password": "Test123!",
+    "firstName": "Alice",
+    "lastName": "Waller",
+    "pageUrl": "alice-waller",
+    "destinationCountry": "KE",
+    "missionStatus": "On-Field",
+    "role": 3
+  },
+  "missionary2": {
+    "email": "m2@h21test.local",
+    "password": "Test123!",
+    "firstName": "Bob",
+    "lastName": "Carter",
+    "pageUrl": "bob-carter",
+    "destinationCountry": "BR",
+    "missionStatus": "On-Field",
+    "role": 3
+  },
+  "supporter": {
+    "email": "supporter@h21test.local",
+    "password": "Test123!",
+    "firstName": "Carol",
+    "lastName": "Smith",
+    "role": 4
+  },
+  "church": {
+    "email": "church@h21test.local",
+    "password": "Test123!",
+    "firstName": "David",
+    "lastName": "Jones",
+    "churchName": "Grace Community Church",
+    "role": 6
+  },
+  "agency": {
+    "email": "agency@h21test.local",
+    "password": "Test123!",
+    "firstName": "Eve",
+    "lastName": "Brown",
+    "agencyName": "Global Missions Agency",
+    "role": 5
+  }
+}

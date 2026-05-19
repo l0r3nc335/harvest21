@@ -1,0 +1,102 @@
+## docker/kong.yml — Kong 2.8 declarative config for local Supabase
+## Routes all Supabase API traffic through a single gateway on port 8000.
+## Consumers match the standard Supabase demo JWT keys.
+
+_format_version: "1.1"
+
+consumers:
+  - username: anon
+    keyauth_credentials:
+      - key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+
+  - username: service_role
+    keyauth_credentials:
+      - key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+
+## ── Open auth endpoints (email confirm links, OAuth callbacks) ─────────────
+## These are hit directly by the user's browser without an API key.
+
+services:
+  - name: auth-v1-open
+    url: http://supabase-auth:9999/verify
+    routes:
+      - name: auth-v1-open
+        strip_path: true
+        paths:
+          - /auth/v1/verify
+    plugins:
+      - name: cors
+
+  - name: auth-v1-open-callback
+    url: http://supabase-auth:9999/callback
+    routes:
+      - name: auth-v1-open-callback
+        strip_path: true
+        paths:
+          - /auth/v1/callback
+    plugins:
+      - name: cors
+
+## ── Auth (GoTrue) — requires API key ──────────────────────────────────────
+  - name: auth-v1
+    url: http://supabase-auth:9999/
+    routes:
+      - name: auth-v1-all
+        strip_path: true
+        paths:
+          - /auth/v1/
+    plugins:
+      - name: cors
+      - name: key-auth
+        config:
+          hide_credentials: false
+          key_names:
+            - apikey
+
+## ── REST API (PostgREST) — requires API key ───────────────────────────────
+  - name: rest-v1
+    url: http://supabase-rest:3000/
+    routes:
+      - name: rest-v1-all
+        strip_path: true
+        paths:
+          - /rest/v1/
+    plugins:
+      - name: cors
+      - name: key-auth
+        config:
+          hide_credentials: true   # apikey is stripped; Authorization passes through for RLS
+          key_names:
+            - apikey
+
+## ── GraphQL (PostgREST) — requires API key ────────────────────────────────
+  - name: graphql-v1
+    url: http://supabase-rest:3000/rpc/resolve
+    routes:
+      - name: graphql-v1-all
+        strip_path: true
+        paths:
+          - /graphql/v1
+    plugins:
+      - name: cors
+      - name: key-auth
+        config:
+          hide_credentials: true
+          key_names:
+            - apikey
+
+## ── Storage — requires API key ────────────────────────────────────────────
+  - name: storage-v1
+    url: http://supabase-storage:5000/
+    routes:
+      - name: storage-v1-all
+        strip_path: true
+        paths:
+          - /storage/v1/
+    plugins:
+      - name: cors
+      - name: key-auth
+        config:
+          hide_credentials: true
+          key_names:
+            - apikey

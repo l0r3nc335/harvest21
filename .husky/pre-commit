@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+CONFLICT_MATCHES=$(echo "$STAGED" | xargs -I {} grep -l -E '^(<{7}|={7}|>{7})( |$)' {} 2>/dev/null || true)
+
+if [ -n "$CONFLICT_MATCHES" ]; then
+  echo ""
+  echo "X Merge conflict markers found in staged files:"
+  echo "$CONFLICT_MATCHES"
+  echo ""
+  echo "Resolve all <<<<<<<, =======, >>>>>>> markers before committing."
+  exit 1
+fi
+
+exit 0

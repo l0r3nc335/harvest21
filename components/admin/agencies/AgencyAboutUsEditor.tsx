@@ -1,0 +1,372 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { Save, Loader2, Upload, X } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/Textarea";
+import toast from "react-hot-toast";
+import { saveAgencyAboutUs } from "@/app/admin/agencies/pageActions";
+import { deleteFileFromStorage } from "@/app/admin/missionaries/[id]/actions";
+import { updatePageDetails } from "@/lib/pageActions";
+import type { AgencyAboutUsContent } from "@/types/agency";
+
+interface AgencyAboutUsEditorProps {
+  agencyId: number;
+  pageId?: number | null;
+  shortQuote: string;
+  onShortQuoteChange: (value: string) => void;
+  initialContent?: AgencyAboutUsContent | null;
+  initialVideoHashedId?: string | null;
+  onSave?: (content: AgencyAboutUsContent, videoHashedId: string | null) => void;
+}
+
+// Fixed sections as per MA-LP-006
+const FIXED_SECTIONS = [
+  { key: "who_we_are", label: "Personal Bio", placeholder: "Tell visitors about your agency's identity and history..." },
+  { key: "mission_vision", label: "Mission / Vision", placeholder: "Describe your mission and vision for global ministry..." },
+  { key: "what_we_do", label: "What We Do", placeholder: "Explain the work and ministries your agency undertakes..." },
+  { key: "where_we_serve", label: "Where We Serve", placeholder: "List the regions and countries where you have missionaries..." },
+  { key: "how_we_operate", label: "How We Operate", placeholder: "Describe your operational model and support structure..." },
+  { key: "values", label: "Values", placeholder: "Outline the core values that guide your agency..." },
+  { key: "contact_information", label: "Contact Information", placeholder: "Provide contact details and how people can connect..." },
+] as const;
+
+export function AgencyAboutUsEditor({
+  agencyId,
+  shortQuote,
+  onShortQuoteChange,
+  initialContent,
+  initialVideoHashedId,
+  onSave,
+}: AgencyAboutUsEditorProps) {
+  // Initialize content state
+  const [content, setContent] = useState<AgencyAboutUsContent>({
+    who_we_are: initialContent?.who_we_are || "",
+    mission_vision: initialContent?.mission_vision || "",
+    what_we_do: initialContent?.what_we_do || "",
+    where_we_serve: initialContent?.where_we_serve || "",
+    how_we_operate: initialContent?.how_we_operate || "",
+    values: initialContent?.values || "",
+    contact_information: initialContent?.contact_information || "",
+  });
+
+  const [videoUrl, setVideoUrl] = useState<string | null>(initialVideoHashedId || null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [videoToDelete, setVideoToDelete] = useState<string | null>(null);
+
+  const videoInputRef = useRef<HTMLInputElement>(null);
+
+  // Cleanup preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (videoPreviewUrl) {
+        URL.revokeObjectURL(videoPreviewUrl);
+      }
+    };
+  }, [videoPreviewUrl]);
+
+  // Check if all required sections are completed (MA-LP-009)
+  // Exclude "who_we_are" (Personal Bio) from completion check as it's hidden
+  const allSectionsComplete = FIXED_SECTIONS.filter(section => section.key !== "who_we_are").every(
+    (section) => content[section.key as keyof AgencyAboutUsContent]?.trim().length > 0
+  );
+
+  const handleContentChange = (key: keyof AgencyAboutUsContent, value: string) => {
+    setContent((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("video/")) {
+      toast.error("Please select a valid video file");
+      return;
+    }
+
+    // Validate file size (max 500MB)
+    const maxSize = 500 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error("Video file is too large. Maximum size is 500MB");
+      return;
+    }
+
+    // Clean up previous preview URL
+    if (videoPreviewUrl) {
+      URL.revokeObjectURL(videoPreviewUrl);
+    }
+
+    setVideoFile(file);
+    const previewUrl = URL.createObjectURL(file);
+    setVideoPreviewUrl(previewUrl);
+  };
+
+  const handleVideoRemove = () => {
+    if (videoUrl) {
+      setVideoToDelete(videoUrl);
+    }
+    if (videoPreviewUrl) {
+      URL.revokeObjectURL(videoPreviewUrl);
+      setVideoPreviewUrl(null);
+    }
+    setVideoFile(null);
+    setVideoUrl(null);
+    if (videoInputRef.current) {
+      videoInputRef.current.value = "";
+    }
+  };
+
+  const handleUploadVideo = async (): Promise<string | null> => {
+    if (!videoFile) return videoUrl;
+
+    setUploadingVideo(true);
+    setUploadProgress(0);
+
+    try {
+      // Delete old video if exists
+      if (videoToDelete) {
+        await deleteFileFromStorage(videoToDelete);
+        setVideoToDelete(null);
+      }
+
+      setUploadProgress(5);
+
+      // Get signed upload URL
+      const signedRes = await fetch("/api/storage/signed-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationType: "agency",
+          organizationId: agencyId,
+          fileName: videoFile.name,
+          folder: "videos",
+        }),
+      });
+
+      if (!signedRes.ok) {
+        throw new Error("Failed to get upload URL");
+      }
+
+      const { signedUrl, publicUrl } = await signedRes.json();
+
+      // Upload video with progress tracking
+      const uploadResult = await new Promise<{ success: boolean; publicUrl?: string; error?: string }>((resolve) => {
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener("progress", (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 95);
+            setUploadProgress(5 + percentComplete);
+          }
+        });
+
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve({ success: true, publicUrl });
+          } else {
+            resolve({ success: false, error: `Upload failed with status ${xhr.status}` });
+          }
+        });
+
+        xhr.addEventListener("error", () => {
+          resolve({ success: false, error: "Network error during upload" });
+        });
+
+        xhr.open("PUT", signedUrl);
+        xhr.setRequestHeader("Content-Type", videoFile.type || "video/mp4");
+        xhr.send(videoFile);
+      });
+
+      if (uploadResult.success && uploadResult.publicUrl) {
+        setVideoUrl(uploadResult.publicUrl);
+        setVideoFile(null);
+        if (videoPreviewUrl) {
+          URL.revokeObjectURL(videoPreviewUrl);
+          setVideoPreviewUrl(null);
+        }
+        if (videoInputRef.current) {
+          videoInputRef.current.value = "";
+        }
+        toast.success("Video uploaded successfully!");
+        return uploadResult.publicUrl;
+      } else {
+        throw new Error(uploadResult.error || "Failed to upload video");
+      }
+    } catch (error) {
+      console.error("Error uploading video:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to upload video");
+      return null;
+    } finally {
+      setUploadingVideo(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleSave = async () => {
+    // Validate all sections are filled (MA-LP-009)
+    if (!allSectionsComplete) {
+      toast.error("Please complete all sections before saving");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      // Upload video if there's a pending file
+      let finalVideoUrl = videoUrl;
+      if (videoFile) {
+        finalVideoUrl = await handleUploadVideo();
+        if (!finalVideoUrl && videoFile) {
+          throw new Error("Failed to upload video");
+        }
+      }
+
+      // Save about us content AND short quote together
+      const templateContent = JSON.stringify(content);
+      const result = await updatePageDetails("agency", agencyId, {
+        templateContent,
+        videoHashedId: finalVideoUrl,
+        shortQuote: shortQuote?.trim() || undefined,
+      });
+
+      if (result.success) {
+        toast.success("Agency page saved successfully!");
+        onSave?.(content, finalVideoUrl);
+      } else {
+        throw new Error(result.message || "Failed to save content");
+      }
+    } catch (error) {
+      console.error("Error saving agency about us:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to save content");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 relative">
+      {/* Loading Overlay */}
+      {(isSaving || uploadingVideo) && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm rounded-lg">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-yellow-500" />
+            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              {uploadingVideo ? `Uploading video... ${uploadProgress}%` : "Saving your changes..."}
+            </p>
+            {uploadingVideo && (
+              <div className="w-48 h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-yellow-500 transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Background Video (Optional - MA-LP-007) */}
+      <div>
+        <label className="block text-sm font-medium text-zinc-700 dark:text-white mb-1">
+          Background Video
+        </label>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+          Upload Agency Video Here (Optional)
+        </p>
+
+        {!videoUrl && !videoFile && (
+          <div>
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/*"
+              onChange={handleVideoSelect}
+              className="hidden"
+            />
+            <div
+              onClick={() => videoInputRef.current?.click()}
+              className="border-2 border-dashed border-zinc-300 dark:border-zinc-600 rounded-lg p-16 flex flex-col items-center justify-center cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors bg-zinc-50 dark:bg-zinc-900"
+            >
+              <Upload className="h-12 w-12 text-zinc-400 dark:text-zinc-500 mb-4" />
+              <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Click to upload video
+              </p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                MP4, MOV, WebM (max 500MB)
+              </p>
+            </div>
+          </div>
+        )}
+
+        {(videoFile && videoPreviewUrl || videoUrl) && (
+          <div className="relative aspect-video w-full max-w-2xl rounded-lg overflow-hidden bg-zinc-900">
+            <video
+              src={videoPreviewUrl || videoUrl || ""}
+              controls
+              playsInline
+              className="w-full h-full object-contain"
+            />
+            {videoFile && (
+              <div className="absolute top-2 left-2 bg-yellow-500 text-black text-xs px-2 py-1 rounded">
+                Pending Upload
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleVideoRemove}
+              className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* All 7 Fixed Sections (MA-LP-006) - Exclude "who_we_are" (Personal Bio) from display */}
+      {FIXED_SECTIONS.filter(section => section.key !== "who_we_are").map((section) => (
+        <div key={section.key} className="space-y-4">
+          <div className="bg-zinc-50 rounded-lg border dark:bg-zinc-800 text-zinc-900 dark:text-white p-4">
+            <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-0.5">
+              This title cannot be edited
+            </label>
+            <h2 className="font-semibold m-0">{section.label}</h2>
+          </div>
+
+          <Textarea
+            value={content[section.key as keyof AgencyAboutUsContent]}
+            onChange={(e) => handleContentChange(section.key as keyof AgencyAboutUsContent, e.target.value)}
+            placeholder={section.placeholder}
+            rows={8}
+            className="min-h-[150px]"
+          />
+        </div>
+      ))}
+
+      <div className="flex justify-end">
+        <Button
+          onClick={handleSave}
+          disabled={isSaving || uploadingVideo || !allSectionsComplete}
+          className="w-full sm:w-auto"
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            "Save Changes"
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+

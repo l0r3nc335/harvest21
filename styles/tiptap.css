@@ -1,0 +1,456 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+.tiptap-root {
+  width: 100%;
+}
+
+.tiptap-editor-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(228 228 231);
+  background-color: rgb(255 255 255);
+  overflow: hidden;
+}
+
+.tiptap-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid rgb(228 228 231);
+  background-color: rgb(250 250 250);
+}
+
+.tiptap-editor-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-right: 0.5rem;
+  margin-right: 0.5rem;
+  border-right: 1px solid rgb(228 228 231);
+}
+
+.tiptap-editor-toolbar-group:last-child {
+  border-right: none;
+  margin-right: 0;
+  padding-right: 0;
+}
+
+.tiptap-toolbar-button {
+  min-width: 2.25rem;
+  height: 2.25rem;
+  padding: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  border: none;
+  background-color: transparent;
+  color: rgb(63 63 70);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.tiptap-toolbar-button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.tiptap-toolbar-button:hover {
+  background-color: rgb(228 228 231);
+}
+
+.tiptap-toolbar-button:active {
+  transform: scale(0.97);
+}
+
+.tiptap-toolbar-button.is-active {
+  background-color: #D3AF37;
+  color: rgb(255 255 255);
+}
+
+.tiptap-toolbar-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.tiptap-editor-body {
+  padding: 1rem;
+  background-color: rgb(255 255 255);
+}
+
+.tiptap-editor-content {
+  min-height: 320px;
+  max-height: 640px;
+  overflow-y: auto;
+  border-radius: 0.5rem;
+  padding: 0.75rem 0.25rem 1rem 0.25rem;
+}
+
+.tiptap-editor-content > .tiptap {
+  padding: 0 0.75rem;
+}
+
+.tiptap-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem 0.75rem 0.75rem;
+  border-top: 1px solid rgb(228 228 231);
+  background-color: rgb(255 255 255);
+}
+
+.tiptap-editor-meta {
+  font-size: 0.75rem;
+  color: rgb(113 113 122);
+}
+
+.tiptap {
+  outline: none;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: rgb(24 24 27);
+}
+
+.tiptap p {
+  margin: 0.5rem 0;
+}
+
+.tiptap h1,
+.tiptap h2,
+.tiptap h3,
+.tiptap h4,
+.tiptap h5 {
+  font-weight: 600;
+  line-height: 1.2;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.tiptap h1 {
+  font-size: 2rem;
+  margin-top: 1.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.tiptap h2 {
+  font-size: 1.6rem;
+  margin-top: 1.5rem;
+}
+
+.tiptap h3 {
+  font-size: 1.35rem;
+}
+
+.tiptap h4 {
+  font-size: 1.15rem;
+}
+
+.tiptap h5 {
+  font-size: 1rem;
+  text-transform: none;
+}
+
+.tiptap ul,
+.tiptap ol {
+  margin: 0.5rem 0 0.75rem 0;
+  padding-left: 1.5rem;
+}
+
+.tiptap ul {
+  list-style-type: disc;
+}
+
+.tiptap ol {
+  list-style-type: decimal;
+}
+
+.tiptap li {
+  margin: 0.25rem 0;
+}
+
+.tiptap a {
+  color: rgb(37 99 235);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.tiptap strong {
+  font-weight: 700;
+}
+
+.tiptap em {
+  font-style: italic;
+}
+
+.tiptap u {
+  text-decoration: underline;
+}
+
+.tiptap mark {
+  background-color: #fef08a;
+  color: inherit;
+  border-radius: 0.25rem;
+  padding: 0.05em 0.25em;
+}
+
+.tiptap code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85em;
+  background-color: rgba(15, 23, 42, 0.04);
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+}
+
+.tiptap pre {
+  margin: 0.75rem 0 1rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background-color: #020617;
+  color: #e5e7eb;
+  font-size: 0.85rem;
+  overflow-x: auto;
+}
+
+.tiptap pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.85em;
+  color: inherit;
+}
+
+.tiptap hr {
+  margin: 1.5rem 0;
+  border: none;
+  border-top: 1px solid rgb(229 231 235);
+}
+
+.tiptap blockquote {
+  margin: 0.75rem 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid rgb(209 213 219);
+  color: rgb(75 85 99);
+  font-style: italic;
+}
+
+.tiptap [data-text-align="left"] {
+  text-align: left;
+}
+
+.tiptap [data-text-align="center"] {
+  text-align: center;
+}
+
+.tiptap [data-text-align="right"] {
+  text-align: right;
+}
+
+.tiptap [data-text-align="justify"] {
+  text-align: justify;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: rgb(156 163 175);
+}
+
+.tiptap img,
+.tiptap video {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 0.75rem;
+  margin: 1rem 0;
+}
+
+.tiptap video {
+  max-height: 480px;
+}
+
+.tiptap-media-wrapper {
+  position: relative;
+  display: block;
+}
+
+.tiptap-media-delete {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background-color: rgba(239, 68, 68, 0.96);
+  color: white;
+  opacity: 0;
+  transform: scale(0.96);
+  transition: opacity 0.15s ease, transform 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.tiptap-media-delete svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.tiptap-media-wrapper:hover .tiptap-media-delete {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.tiptap-media-delete:hover {
+  background-color: rgba(220, 38, 38, 1);
+}
+
+[data-type="columns"] {
+  display: grid;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+[data-type="columns"][data-columns="2"] {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 768px) {
+  [data-type="columns"][data-columns="2"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+[data-type="columns"][data-columns="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tiptap-column {
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  min-height: 80px;
+}
+
+.tiptap-column p:first-child {
+  margin-top: 0;
+}
+
+.tiptap-column p:last-child {
+  margin-bottom: 0;
+}
+
+.tiptap-column-wrapper {
+  position: relative;
+}
+
+.tiptap-column-delete {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background-color: rgba(239, 68, 68, 0.9);
+  color: white;
+  opacity: 0;
+  transform: scale(0.96);
+  transition: opacity 0.15s ease, transform 0.15s ease,
+    background-color 0.15s ease;
+  z-index: 5;
+}
+
+.tiptap-column-wrapper:hover .tiptap-column-delete {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.tiptap-column-delete:hover {
+  background-color: rgba(220, 38, 38, 1);
+}
+
+.tiptap .selectedNode {
+  outline: 2px solid #D3AF37;
+  outline-offset: 2px;
+}
+
+.tiptap-viewer {
+  width: 100%;
+}
+
+.tiptap-viewer .tiptap {
+  min-height: 0;
+}
+
+.dark .tiptap-editor-shell {
+  border-color: rgba(31, 41, 55, 0.9);
+  background-color: rgb(15 23 42);
+}
+
+.dark .tiptap-editor-toolbar {
+  background-color: rgb(17 24 39);
+  border-color: rgba(31, 41, 55, 0.9);
+}
+
+.dark .tiptap-editor-body {
+  background-color: rgb(15 23 42);
+}
+
+.dark .tiptap-editor-content {
+  border-color: rgba(31, 41, 55, 0.9);
+}
+
+.dark .tiptap {
+  color: rgb(226 232 240);
+}
+
+.dark .tiptap hr {
+  border-color: rgba(55, 65, 81, 0.9);
+}
+
+.dark .tiptap code {
+  background-color: rgba(15, 23, 42, 0.7);
+}
+
+.dark .tiptap mark {
+  background-color: #854d0e;
+}
+
+.dark .tiptap a {
+  color: rgb(96 165 250);
+}
+
+.dark .tiptap blockquote {
+  border-left-color: rgba(75, 85, 99, 0.9);
+  color: rgb(148 163 184);
+}
+
+.dark .tiptap-column {
+  border-color: rgba(55, 65, 81, 0.9);
+}
+
+.dark .tiptap-media-delete {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.75);
+}
+
+

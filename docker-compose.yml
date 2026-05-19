@@ -1,0 +1,280 @@
+# docker-compose.yml — H21 fully self-contained test environment
+#
+# Starts the entire Supabase stack + Next.js app inside Docker.
+# Nothing on the host machine is required except Docker Desktop.
+#
+# Port map (all accessible from your Mac):
+#   http://localhost:3001   → Next.js app  (run Cypress tests against this)
+#   http://localhost:54321  → Supabase API (used by Cypress seeding tasks)
+#   http://localhost:54323  → Supabase Studio
+#   http://localhost:54324  → Mailpit inbox
+#
+# Startup order:
+#   supabase-db → supabase-migrate (exits) → supabase-auth + supabase-rest
+#             → supabase-kong → h21-app
+#
+# Usage:
+#   pnpm docker:build                 ← build + start (first time / after code changes)
+#   docker compose up -d             ← start (image already built)
+#   docker compose down              ← stop
+#   docker compose logs -f h21-app  ← tail app logs
+
+name: h21-test
+
+# ── Shared JWT / DB values ─────────────────────────────────────────────────────
+# These are the standard Supabase local-dev demo keys (public knowledge).
+x-supabase-env: &supabase-env
+  JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+  ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+  SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+  POSTGRES_HOST: supabase-db
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  POSTGRES_DB: postgres
+
+services:
+
+  # ── 1. PostgreSQL ─────────────────────────────────────────────────────────────
+  supabase-db:
+    image: supabase/postgres:17.6.1.032
+    restart: unless-stopped
+    ports:
+      - "54322:5432"   # direct DB access for debugging
+    volumes:
+      - supabase-db-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      JWT_EXP: "3600"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # ── 2. Migration runner (init container — exits after applying migrations) ─────
+  supabase-migrate:
+    image: postgres:17-alpine
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    volumes:
+      - ./supabase/migrations:/migrations:ro
+      - ./supabase/seed.sql:/seed.sql:ro
+      - ./docker/migrate.sh:/migrate.sh:ro
+    environment:
+      PGHOST: supabase-db
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    command: ["/bin/sh", "/migrate.sh"]
+    restart: "no"
+
+  # ── 3. GoTrue (auth) ──────────────────────────────────────────────────────────
+  supabase-auth:
+    image: supabase/gotrue:v2.186.0
+    restart: unless-stopped
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+      supabase-migrate:
+        condition: service_completed_successfully
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: http://localhost:54321
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: "postgresql://supabase_auth_admin:postgres@supabase-db:5432/postgres?search_path=auth"
+      GOTRUE_SITE_URL: http://localhost:3001
+      GOTRUE_URI_ALLOW_LIST: "http://localhost:3001/**,http://localhost:3000/**"
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_SMTP_ADMIN_EMAIL: admin@h21test.local
+      GOTRUE_SMTP_HOST: mailpit
+      GOTRUE_SMTP_PORT: "1025"
+      GOTRUE_SMTP_USER: ""
+      GOTRUE_SMTP_PASS: ""
+      GOTRUE_SMTP_SENDER_NAME: Harvest21
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/v1/verify
+      GOTRUE_LOG_LEVEL: error
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9999/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  # ── 4. PostgREST (REST API) ───────────────────────────────────────────────────
+  supabase-rest:
+    image: postgrest/postgrest:v13.0.5
+    restart: unless-stopped
+    depends_on:
+      supabase-migrate:
+        condition: service_completed_successfully
+    environment:
+      PGRST_DB_URI: "postgresql://postgres:postgres@supabase-db:5432/postgres"
+      PGRST_DB_SCHEMA: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      PGRST_APP_SETTINGS_JWT_EXP: "3600"
+      PGRST_LOG_LEVEL: error
+
+  # ── 5. Storage ────────────────────────────────────────────────────────────────
+  supabase-storage:
+    image: supabase/storage-api:v1.33.0
+    restart: unless-stopped
+    depends_on:
+      supabase-migrate:
+        condition: service_completed_successfully
+    volumes:
+      - supabase-storage-data:/var/lib/storage
+    environment:
+      ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+      SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+      POSTGREST_URL: http://supabase-rest:3000
+      PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      DATABASE_URL: "postgresql://supabase_storage_admin:postgres@supabase-db:5432/postgres"
+      FILE_SIZE_LIMIT: "52428800"
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: stub
+      GLOBAL_S3_BUCKET: stub
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+
+  # ── 6. Kong API gateway ───────────────────────────────────────────────────────
+  supabase-kong:
+    image: kong:2.8.1
+    restart: unless-stopped
+    depends_on:
+      supabase-auth:
+        condition: service_healthy
+      supabase-rest:
+        condition: service_started
+    ports:
+      - "54321:8000"   # Supabase API — Cypress tasks connect here
+      - "54320:8443"   # HTTPS (optional)
+    volumes:
+      - ./docker/kong.yml:/var/lib/kong/kong.yml:ro
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      KONG_LOG_LEVEL: warn
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # ── 7. Supabase Studio ────────────────────────────────────────────────────────
+  supabase-studio:
+    image: supabase/studio:20250317-6955350
+    restart: unless-stopped
+    depends_on:
+      supabase-kong:
+        condition: service_healthy
+    ports:
+      - "54323:3000"
+    environment:
+      STUDIO_PG_META_URL: http://supabase-kong:8000/pg
+      POSTGRES_PASSWORD: postgres
+      DEFAULT_ORGANIZATION_NAME: H21 Local
+      DEFAULT_PROJECT_NAME: h21-test
+      SUPABASE_URL: http://supabase-kong:8000
+      SUPABASE_PUBLIC_URL: http://localhost:54321
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+      SUPABASE_SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+
+  # ── 8. Mailpit (email testing) ────────────────────────────────────────────────
+  mailpit:
+    image: axllent/mailpit:v1.21
+    restart: unless-stopped
+    ports:
+      - "54324:8025"   # web UI — Cypress tasks fetch emails here
+      - "54325:1025"   # SMTP — GoTrue sends email here
+
+  # ── 9. Next.js app ────────────────────────────────────────────────────────────
+  h21-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: h21-cypress-app
+    restart: unless-stopped
+    depends_on:
+      supabase-kong:
+        condition: service_healthy
+    ports:
+      - "3001:3000"    # Cypress baseUrl → http://localhost:3001
+    env_file:
+      - .env.cypress-docker
+    environment:
+      # Override: server-side Next.js code reaches Supabase via the internal
+      # Docker service name. NEXT_PUBLIC_SUPABASE_URL (in env_file) is used
+      # by the browser client and remains http://localhost:54321.
+      SUPABASE_URL: http://supabase-kong:8000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
+
+  # ── 10. Cypress — headless runner + HTML report ───────────────────────────────
+  # Profile "cypress" keeps this out of the default `docker compose up`.
+  # Usage:  docker compose run --rm cypress-runner
+  cypress-runner:
+    image: cypress/included:15.13.0
+    profiles: ["cypress"]
+    depends_on:
+      h21-app:
+        condition: service_healthy
+    working_dir: /e2e
+    volumes:
+      - .:/e2e
+    environment:
+      CYPRESS_BASE_URL: http://h21-app:3000
+      CYPRESS_SUPABASE_URL: http://supabase-kong:8000
+      CYPRESS_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+      CYPRESS_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+      CYPRESS_MAILPIT_URL: http://mailpit:8025
+    # On Linux, host.docker.internal is not injected automatically
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: >
+      run
+      --spec "cypress/e2e/missionary-e2e/**/*.cy.ts"
+      --reporter mochawesome
+      --reporter-options "reportDir=cypress/reports,overwrite=false,html=true,json=true"
+
+volumes:
+  supabase-db-data:
+  supabase-storage-data:
+
+# Lower MTU from the default 1500 to 1450 to avoid ECONNRESET errors on
+# networks where the effective MTU is lower (VPN, some WiFi adapters).
+# All services share this network so internal DNS resolution works correctly.
+networks:
+  default:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: "1450"

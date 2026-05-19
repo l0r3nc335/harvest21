@@ -1,0 +1,143 @@
+# Taskfile.yml — H21 Cypress E2E test orchestration
+#
+# Prerequisites:
+#   brew install go-task/tap/go-task   (install Task runner)
+#   Docker Desktop running
+#
+# Usage:
+#   task              # fresh DB + build image + run all E2E tests headlessly
+#   task build        # build h21-app image and start services (keeps existing DB)
+#   task fresh        # tear down, rebuild everything, run tests (guaranteed clean slate)
+#   task test         # run Cypress headless inside Docker → cypress/reports/
+#   task open         # open Cypress GUI on host against running Docker stack
+#   task down         # stop all containers (keeps DB volume)
+#   task reset        # stop + wipe volumes (next build seeds fresh DB)
+#   task logs         # tail all service logs
+#   task logs-app     # tail h21-app logs only
+#   task status       # show running container health
+
+version: '3'
+
+vars:
+  # Standard Supabase local-dev demo JWTs (public knowledge, expire 2033)
+  DEMO_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+  DEMO_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+
+tasks:
+
+  # ── Default: full clean cycle ────────────────────────────────────────────────
+  default:
+    desc: "Tear down, seed a fresh Supabase DB, build Docker image, run all E2E tests"
+    cmds:
+      - task: reset
+      - task: build
+      - task: test
+
+  # ── fresh: alias for the full clean cycle (explicit name) ───────────────────
+  fresh:
+    desc: "Full clean cycle — wipe DB, rebuild image, seed DB, run tests"
+    cmds:
+      - task: reset
+      - task: build
+      - task: test
+
+  # ── build: build image + start all services (DB seeded on first start) ──────
+  build:
+    desc: "Build h21-app Docker image, start all services, wait until healthy"
+    summary: |
+      Runs docker/migrate.sh inside supabase-migrate container which:
+        1. Waits for PostgreSQL to be ready
+        2. Sets reserved role passwords (supabase_auth_admin, supabase_storage_admin)
+        3. Applies all 20*.sql migrations in timestamp order
+        4. Runs supabase/seed.sql (admin + missionaries + supporter + static data)
+      Then starts h21-app (Next.js) and waits up to 3 minutes for it to be healthy.
+    cmds:
+      - bash scripts/docker-build.sh
+
+  # ── test: run Cypress headlessly inside Docker ───────────────────────────────
+  test:
+    desc: "Run all Cypress E2E tests headlessly inside the cypress-runner container"
+    summary: |
+      Runs cypress/included:15.13.0 against http://h21-app:3000 (internal Docker DNS).
+      Cypress task Node.js process reaches Supabase at http://supabase-kong:8000.
+      Reports written to cypress/reports/ (HTML + JSON via mochawesome).
+    cmds:
+      - |
+        echo ""
+        echo "── Running Cypress E2E tests ───────────────────────────"
+        docker compose run --rm cypress-runner || true
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "  Test run complete."
+        echo "  HTML report:  open cypress/reports/index.html"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+  # ── open: Cypress interactive GUI on the host ────────────────────────────────
+  open:
+    desc: "Open Cypress interactive runner on the host against the Docker stack"
+    summary: |
+      Runs the Cypress Electron GUI on your Mac. The Docker stack must already be
+      running (task build). Tests run against http://localhost:3001.
+      Supabase API is at http://localhost:54321.
+    cmds:
+      - |
+        npx cypress open \
+          --config baseUrl=http://localhost:3001 \
+          --env "CYPRESS_SUPABASE_URL=http://localhost:54321,CYPRESS_SERVICE_ROLE_KEY={{.DEMO_SERVICE_ROLE_KEY}},CYPRESS_MAILPIT_URL=http://localhost:54324"
+    preconditions:
+      - sh: "curl -sf http://localhost:3001 > /dev/null 2>&1"
+        msg: |
+          Docker stack is not running.
+          Start it with:  task build
+
+  # ── seed: re-run DB seed without rebuilding the image ───────────────────────
+  seed:
+    desc: "Re-run migrations + seed.sql against the running DB (no image rebuild)"
+    summary: |
+      Stops and removes the existing supabase-migrate container, then re-creates
+      it so docker/migrate.sh runs again. Useful after schema or seed changes
+      without needing a full image rebuild.
+    cmds:
+      - docker compose rm -f supabase-migrate
+      - docker compose run --rm supabase-migrate
+    preconditions:
+      - sh: "docker compose ps supabase-db | grep -q 'healthy'"
+        msg: "supabase-db is not running. Run 'task build' first."
+
+  # ── reset: stop all containers + wipe volumes (next build = fresh DB) ────────
+  reset:
+    desc: "Stop all containers and remove volumes — guarantees a fresh DB on next start"
+    cmds:
+      - docker compose down -v --remove-orphans 2>/dev/null || true
+      - echo "  Volumes removed. Next 'task build' will seed a fresh database."
+
+  # ── down: stop containers, keep DB volume ────────────────────────────────────
+  down:
+    desc: "Stop all Docker containers (DB volume is preserved)"
+    cmds:
+      - docker compose down
+      - echo "  Stack stopped. DB data preserved. Run 'task build' to restart."
+
+  # ── status: show container health ────────────────────────────────────────────
+  status:
+    desc: "Show status and health of all running containers"
+    cmds:
+      - docker compose ps
+
+  # ── logs: tail all service logs ──────────────────────────────────────────────
+  logs:
+    desc: "Tail logs from all Docker services"
+    cmds:
+      - docker compose logs -f
+
+  # ── logs-app: tail h21-app only ──────────────────────────────────────────────
+  logs-app:
+    desc: "Tail h21-app (Next.js) logs only"
+    cmds:
+      - docker compose logs -f h21-app
+
+  # ── logs-db: tail migration output ───────────────────────────────────────────
+  logs-db:
+    desc: "Show supabase-migrate output (migration + seed log)"
+    cmds:
+      - docker compose logs supabase-migrate
